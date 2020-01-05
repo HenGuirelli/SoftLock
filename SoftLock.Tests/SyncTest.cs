@@ -18,11 +18,9 @@ namespace SoftLock.Tests
     [TestClass]
     public class SyncTest
     {
-
         [TestMethod]
         public void OnSoftLock_GuaranteeNotLock()
         {
-
             var qtdPassedInNonBlockCodeOne = 0;
             var qtdPassedInNonBlockCodeTwo = 0;
             var qtdPassedInBlockCode = 0;
