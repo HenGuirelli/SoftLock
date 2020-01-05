@@ -22,10 +22,13 @@ namespace SoftLock.Tests
         [TestMethod]
         public void OnSoftLock_GuaranteeNotLock()
         {
+
+            var qtdPassedInNonBlockCodeOne = 0;
+            var qtdPassedInNonBlockCodeTwo = 0;
+            var qtdPassedInBlockCode = 0;
+
             var softLock = new SoftLock();
-
             var stringBuilder = new StringBuilder();
-
             var mock = new Mock<IMockInterfaceTest>();
             mock.Setup(x => x.NonBlockCodeOne())
                 .Callback(() =>
@@ -37,6 +40,7 @@ namespace SoftLock.Tests
                     }
 
                     // Some code
+                    Interlocked.Increment(ref qtdPassedInNonBlockCodeOne);
 
                     if (softLock.InBlockCode)
                     {
@@ -54,6 +58,7 @@ namespace SoftLock.Tests
                     }
 
                     // Some code
+                    Interlocked.Increment(ref qtdPassedInNonBlockCodeTwo);
 
                     if (softLock.InBlockCode)
                     {
@@ -71,6 +76,7 @@ namespace SoftLock.Tests
                     }
 
                     // Some code
+                    Interlocked.Increment(ref qtdPassedInBlockCode);
 
                     if (!softLock.InBlockCode)
                     {
@@ -81,7 +87,7 @@ namespace SoftLock.Tests
 
 
             var obj = mock.Object;
-            var qtdTest = 10000;
+            var qtdTest = 500000;
             Task.WaitAll(
                 Task.Factory.StartNew(() =>
                 {
@@ -100,7 +106,10 @@ namespace SoftLock.Tests
                 })
             );
 
-            Assert.AreEqual(string.Empty, stringBuilder);
+            Assert.AreEqual(string.Empty, stringBuilder.ToString());
+            Assert.AreEqual(qtdTest, qtdPassedInNonBlockCodeOne);
+            Assert.AreEqual(qtdTest, qtdPassedInNonBlockCodeTwo);
+            Assert.AreEqual(qtdTest, qtdPassedInBlockCode);
         }
 
         private void ExecTimes(int times, Action cb)

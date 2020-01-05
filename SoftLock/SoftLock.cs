@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SoftLock
 {
@@ -11,63 +12,53 @@ namespace SoftLock
         private bool _inBlockCode;
         public bool InBlockCode => _inBlockCode;
 
-        private readonly static object _lockObj = new object();
+        private readonly static object _lockObjHard = new object();
+        private readonly static object _lockObjSoft = new object();
+        private readonly static object _lockCondition = new object();
 
         public void EnterSoftLock()
         {
-            lock (_lockObj)
+            lock (_lockCondition)
             {
-                if (!_inBlockCode)
+                // Wait Hard Block
+                if (Monitor.IsEntered(_lockObjHard))
                 {
-                    return;
+                    Monitor.Wait(_lockObjHard);
+                }
+                if (!Monitor.IsEntered(_lockObjSoft))
+                {
+                    Monitor.Enter(_lockObjSoft);
                 }
             }
-            SpinWait.SpinUntil(() => _inBlockCode);
             Interlocked.Increment(ref _qtdThreadInSoftLock);
+        }
+
+        public void EnterHardLock()
+        {
+            lock (_lockCondition)
+            {
+                Monitor.Enter(_lockObjHard);
+                Monitor.Enter(_lockObjSoft);
+                Interlocked.Increment(ref _qtdThreadInHardLock);
+                Volatile.Write(ref _inBlockCode, true);
+            }
         }
 
         public void ExitSoftLock()
         {
             Interlocked.Decrement(ref _qtdThreadInSoftLock);
-        }
-
-        public void EnterHardLock()
-        {
-            SpinWait.SpinUntil(() =>
-            {
-                try
-                {
-                    Monitor.Enter(_lockObj);
-                    return _qtdThreadInSoftLock > 0 || _qtdThreadInHardLock > 0;
-                }
-                finally
-                {
-                    if (_qtdThreadInSoftLock > 0 || _qtdThreadInHardLock > 0)
-                    {
-                        Monitor.Exit(_lockObj);
-                    }
-                }
-            });
-
-
-            if (_qtdThreadInSoftLock <= 0 && _qtdThreadInHardLock <= 0)
-            {
-                Interlocked.Increment(ref _qtdThreadInHardLock);
-                Volatile.Write(ref _inBlockCode, true);
-                return;
-            }
+            Monitor.Exit(_lockObjSoft);
         }
 
         public void ExitHardLock()
         {
-            lock (_lockObj)
+            Interlocked.Decrement(ref _qtdThreadInHardLock);
+            if (_qtdThreadInHardLock == 0)
             {
-                Interlocked.Decrement(ref _qtdThreadInHardLock);
-                if (_qtdThreadInHardLock == 0)
-                {
-                    Volatile.Write(ref _inBlockCode, false);
-                }
+                Volatile.Write(ref _inBlockCode, false);
             }
+            Monitor.Exit(_lockObjHard);
+            Monitor.Exit(_lockObjSoft);
         }
     }
 }
